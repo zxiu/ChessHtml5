@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Insert title here</title>
+<style type="text/css">
+body {
+	margin-left: 0px;
+	margin-top: 0px;
+}
+</style>
+
+<script type="text/javascript" src="pixi.dev.js"></script>
+</head>
+<body>
+	<script>
+		// create an new instance of a pixi stage
+		var stage = new PIXI.Stage(0x66FF99);
+
+		// create a renderer instance.
+
+		var width = window.screen.availWidth;
+		var height = window.screen.availHeight;
+		var length = Math.min(width, height);
+		length = 360;
+		var size = 360 / 8;
+		var renderer = PIXI.autoDetectRenderer(width, height);
+		// add the renderer view element to the DOM
+		document.body.appendChild(renderer.view);
+
+		var board, blackHorse1, blackHorse2, blackKing;
+		function initiateSprite() {
+			board = new PIXI.Sprite(PIXI.Texture
+					.fromImage("resources/images/board.jpg"));
+			// center the sprites anchor point
+			board.width = length;
+			board.height = length;
+			board.anchor.x = 0;
+			board.anchor.y = 0;
+			board.position.x = 0;
+			board.position.y = 0;
+			stage.addChild(board);
+
+			blackHorse1 = createButton("resources/images/glchess.png", 1, 0);
+			blackHorse2 = createButton("resources/images/glchess.png", 6, 0);
+			blackKing = createButton("resources/images/glchess.png", 4, 0);
+			
+		}
+
+		function createButton(path, x, y) {
+			var button = new PIXI.Sprite(PIXI.Texture.fromImage(path));
+			button.width = size;
+			button.height = size;
+			button.position.x = calc(x);
+			button.position.y = calc(y);
+			button.setInteractive(true);
+			button.buttonMode = true;
+			button.mousedown = button.touchstart = function(data) {
+				// store a refference to the data
+				// The reason for this is because of multitouch
+				// we want to track the movement of this particular touch
+				this.data = data;
+				this.originalX = this.position.x;
+				this.originalY = this.position.y;
+				this.originalTexture=this.texture;
+				this.alpha = 0.9;
+				this.dragging = true;
+			};
+			button.mouseup = button.mouseupoutside = button.touchend = button.touchendoutside = function(
+					data) {
+				this.alpha = 1
+				this.dragging = false;
+				// set the interaction data to null
+				this.data = null;
+				if (!inStage(this)) {
+					this.position.x = this.originalX;
+					this.position.y = this.originalY;
+				}
+				this.texture=this.originalTexture;
+			};
+
+			button.mousemove = button.touchmove = function(data) {
+				if (this.dragging) {
+					// need to get parent coords..
+					var newPosition = this.data.getLocalPosition(this.parent);
+					this.position.x = newPosition.x - size / 2;
+					this.position.y = newPosition.y - size / 2;
+					this.texture=PIXI.Texture.fromImage("bunny.png");
+				}
+			}
+			stage.addChild(button);
+			return button;
+		}
+
+		function calc(index) {
+			return index * size;
+		}
+
+		function inStage(button) {
+			if (button.position.x<0||button.position.x>length - size
+					|| button.position.y<0||button.position.y>length - size) {
+				return false;
+			} else {
+				return true;
+			}
+		}
+
+		function animate() {
+			requestAnimFrame(animate);
+			// just for fun, lets rotate mr rabbit a little
+			//board.rotation += 0.01;
+			// render the stage   
+			renderer.render(stage);
+		}
+
+		function getChessPosition(p) {
+			return value * size;
+		}
+
+		initiateSprite();
+		requestAnimFrame(animate);
+	</script>
+</body>
+</html>
