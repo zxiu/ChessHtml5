@@ -16,6 +16,9 @@ body {
 	<script>
 		// create an new instance of a pixi stage
 		var stage = new PIXI.Stage(0x66FF99);
+		var offX = 0;
+		var offY = 0;
+
 		var width = window.screen.availWidth;
 		var height = window.screen.availHeight;
 		//var length = Math.min(width, height);
@@ -23,59 +26,103 @@ body {
 		var size = 360 / 8;
 		var renderer = PIXI.autoDetectRenderer(length, length);
 		var sound = new Audio('resources/audio/down.mp3');
-		
+		var forbid = PIXI.Texture.fromImage("resources/images/forbid.png");
+		var hammer = PIXI.Texture.fromImage("resources/images/hammer.png");
+
 		// Costant : name to the role of Chessmen
-		var WHITE="WHITE",BLACK="BLACK";
-		var KING="KING",QUEEN="QUEEN",ROOK="ROOK",KNIGHT="KNIGHT",BISHOP="BISHOP",PAWN="PAWN";
-	
-		
+		var WHITE = true, BLACK = false;
+		var KING = "KING", QUEEN = "QUEEN", ROOK = "ROOK", KNIGHT = "KNIGHT", BISHOP = "BISHOP", PAWN = "PAWN";
+		var curPlayer = WHITE;
 		// Class of Square
-		var Square = {
-				createNew:function(i,j){
-					var chessmen=null;
-					this.i=i;
-					this.j=j;
-				}
+		function Square(i, j) {
+			this.i = i;
+			this.j = j;
+			this.chessmen = null;
 		};
 		var squares = new Array();
-		
+		for ( var i = 0; i < 8; i++) {
+			squares[i] = new Array();
+			for ( var j = 0; j < 8; j++) {
+				squares[i][j] = new Square(i, j);
+			}
+		}
+
 		var Chessmen = {
-				create:function(player,role,i,j,path){
-					
-					chessmen=new PIXI.Sprite(PIXI.Texture.fromImage(path));
-					chessmen.setInteractive(true);
-					chessmen.buttonMode = true;
-					chessmen.player=player;
-					chessmen.role=role;
-					chessmen.i=i;
-					chessmen.j=j;
-					chessmen.onboard=true;
-					chessmen.step=0;
-					
-					chessmen.width=size;
-					chessmen.height=size
-					chessmen.anchor.x = 0.5;
-					chessmen.anchor.y = 0.5;
-					chessmen.position.x=calc(i);
-					chessmen.position.y=calc(j);
-					
-					chessmen.mousedown = chessmen.touchstart = function(data) {
-						// store a refference to the data
-						// The reason for this is because of multitouch
-						// we want to track the movement of this particular touch
-						var parent=this.parent;
+			create : function(player, role, i, j, path) {
+				chessmen = new PIXI.Sprite(PIXI.Texture.fromImage(path));
+				chessmen.chessTexture = PIXI.Texture.fromImage(path)
+				chessmen.setInteractive(true);
+				chessmen.buttonMode = true;
+				chessmen.player = player;
+				chessmen.role = role;
+				chessmen.i = i;
+				chessmen.j = j;
+				chessmen.onboard = true;
+				chessmen.step = 0;
+
+				chessmen.width = size;
+				chessmen.height = size;
+				chessmen.anchor.x = 0.5;
+				chessmen.anchor.y = 0.5;
+				chessmen.position.x = calcPosition(i);
+				chessmen.position.y = calcPosition(j);
+
+				squares[i][j].chessmen = chessmen;
+
+				chessmen.mousedown = chessmen.touchstart = function(data) {
+					if (curPlayer == this.player) {
+						var parent = this.parent;
 						parent.removeChild(this);
 						parent.addChild(this);
-						
+
 						this.data = data;
 						this.originalX = this.position.x;
 						this.originalY = this.position.y;
 						this.alpha = 0.9;
 						this.dragging = true;
-					};
-					
-					chessmen.mouseup = chessmen.mouseupoutside = chessmen.touchend = chessmen.touchendoutside = function(
-							data) {
+					}
+				};
+
+				chessmen.mousemove = chessmen.touchmove = function(data) {
+					if (curPlayer == this.player && this.dragging) {
+						// need to get parent coords..
+						var newPosition = this.data.getLocalPosition(this.parent);
+						this.position.x = newPosition.x;
+						this.position.y = newPosition.y;
+
+						var square = calcSquare(this.position.x, this.position.y);
+						if (allowMove(this)) {
+							this.texture = this.chessTexture;
+							this.width = size;
+							this.height = size;
+						} else {
+							this.setTexture(forbid);
+							this.width = size;
+							this.height = size;
+						}
+
+						/* else if (square.chessmen == null) {
+							this.texture = this.chessTexture;
+							this.width = size;
+							this.height = size;
+						} else {
+							if (square.chessmen.player == this.player) {
+								this.setTexture(forbid);
+								this.width = size;
+								this.height = size;
+							}
+							if (square.chessmen.player != this.player) {
+								this.setTexture(hammer);
+								this.width = size;
+								this.height = size;
+							}
+
+						} */
+					}
+				}
+
+				chessmen.mouseup = chessmen.mouseupoutside = chessmen.touchend = chessmen.touchendoutside = function(data) {
+					if (curPlayer == this.player) {
 						this.alpha = 1
 						this.dragging = false;
 						// set the interaction data to null
@@ -84,40 +131,95 @@ body {
 							this.position.x = this.originalX;
 							this.position.y = this.originalY;
 						}
-						sound.play();
-					};
 
-					chessmen.mousemove = chessmen.touchmove = function(data) {
-						if (this.dragging) {
-							// need to get parent coords..
-							var newPosition = this.data.getLocalPosition(this.parent);
-							this.position.x = newPosition.x;
-							this.position.y = newPosition.y;
-							
-							//this.texture = PIXI.Texture.fromImage("bunny.png");
-						}
+						sound.play();
+						curPlayer = !curPlayer;
 					}
-					
-					stage.addChild(chessmen);
-				}
-								
+				};
+
+				stage.addChild(chessmen);
+
+			}
+
 		}
-		
-		
-		
-	
+
+		function allowMove(chessmen) {
+
+			var square = calcSquare(chessmen.position.x, chessmen.position.y);
+			if (square.chessmen == chessmen) {
+				return true;
+			}
+			if (square.chessmen == null) {
+				return judgeMove(chessmen);
+			}
+			if (square.chessmen.player == chessmen.player) {
+				return false;
+			} else {
+				return allowEat(chessmen);
+			}
+			return false;
+		};
+
+		function judgeMove(chessmen) {
+			switch (chessmen.role) {
+			case KING:
+				break;
+			case QUEEN:
+				break;
+			case PAWN:
+				var offJ = 0;
+				if (chessmen.player == BLACK) {
+					offJ = 1;
+				} else if (chessmen.player == WHITE) {
+					offJ = -1;
+				}
+				if (chessmen.step == 0) {
+					offJ = offJ * 2;
+				}
+				;
+				var square = calcSquare(chessmen.position.x, chessmen.position.y);
+				if ((square.j - chessmen.j == offJ || square.j - chessmen.j == offJ / 2)&& square.i-chessmen.i==0) {
+					return true;
+				} else {
+					return false;
+				}
+				break;
+			}
+			return false;
+		}
+
+		function allowEat(chessmen) {
+			switch (chessmen.role) {
+			case KING:
+				break;
+			case QUEEN:
+				break;
+			case PAWN:
+				var offI=0,offJ = 0;
+				if (chessmen.player == BLACK) {
+					offJ = 1;
+				} else if (chessmen.player == WHITE) {
+					offJ = -1;
+				}
+				
+				var square = calcSquare(chessmen.position.x, chessmen.position.y);
+				if (square.j - chessmen.j == offJ && Math.abs(square.i-chess.i)==1) {
+					return true;
+				} else {
+					return false;
+				}
+				break;
+			}
+		}
 
 		// create a renderer instance.
 
-	
-
 		// add the renderer view element to the DOM
 		document.body.appendChild(renderer.view);
-		
+
 		var positions;
 		function initiateSprite() {
-			board = new PIXI.Sprite(PIXI.Texture
-					.fromImage("resources/images/312px-Chessboard480.svg.png"));
+			board = new PIXI.Sprite(PIXI.Texture.fromImage("resources/images/312px-Chessboard480.svg.png"));
 			// center the sprites anchor point
 			board.width = length;
 			board.height = length;
@@ -143,7 +245,7 @@ body {
 			Chessmen.create(BLACK, PAWN, 5, 1, "resources/images/Chess_pdt45.svg");
 			Chessmen.create(BLACK, PAWN, 6, 1, "resources/images/Chess_pdt45.svg");
 			Chessmen.create(BLACK, PAWN, 7, 1, "resources/images/Chess_pdt45.svg");
-			
+
 			Chessmen.create(WHITE, ROOK, 0, 7, "resources/images/Chess_rlt45.svg");
 			Chessmen.create(WHITE, KNIGHT, 1, 7, "resources/images/Chess_nlt45.svg");
 			Chessmen.create(WHITE, BISHOP, 2, 7, "resources/images/Chess_blt45.svg");
@@ -160,23 +262,19 @@ body {
 			Chessmen.create(WHITE, PAWN, 5, 6, "resources/images/Chess_plt45.svg");
 			Chessmen.create(WHITE, PAWN, 6, 6, "resources/images/Chess_plt45.svg");
 			Chessmen.create(WHITE, PAWN, 7, 6, "resources/images/Chess_plt45.svg");
-			
-			for (var i=0;i<8;i++){
-				squares[i]=new Array();
-				for (var j=0;j<8;j++){
-					squares[i][j]=Square.createNew(i,j);
-				}		
-			}
-			
+
 		}
 
-		function calc(index) {
+		function calcPosition(index) {
 			return index * size + size / 2;
 		}
 
+		function calcSquare(x, y) {
+			return squares[Math.floor((x - offX) / size)][Math.floor((y - offY) / size)];
+		}
+
 		function isInside(button) {
-			if (button.position.x<0||button.position.x>length
-					|| button.position.y<0||button.position.y>length) {
+			if (button.position.x<0||button.position.x>length || button.position.y<0||button.position.y>length) {
 				return false;
 			} else {
 				return true;
